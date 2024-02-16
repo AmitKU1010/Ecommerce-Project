@@ -4,6 +4,7 @@ const { generateToken } = require('../config/jwtToken');
 const validateMongoDbid = require('../utils/validateMongodbId');
 const { generateRefreshToken } = require('../config/refreshToken');
 const jwt = require('jsonwebtoken');
+const { sendEmail } = require('./emailCtrl');
 
 
 
@@ -24,7 +25,6 @@ const createUser = asyncHandler(async (req,res) =>{
 
 const loginUserCtrl = asyncHandler(async(req,res)=>{
     const {email,password} = req.body;
-    console.log(email,password);
     const findUser = await User.findOne({email});
     if(findUser && (await findUser.isPasswordMatched(password))){
         const refreshToken = await generateRefreshToken(findUser?._id);
@@ -190,7 +190,6 @@ const unblockUser = asyncHandler(async(req,res,next)=>{
    })
 
    const updatePassword = asyncHandler(async(req,res)=>{
-    console.log(req.user,"sss")
     const {_id} = req.user;
     const {password} = req.body;
     validateMongoDbid(_id);
@@ -205,7 +204,32 @@ const unblockUser = asyncHandler(async(req,res,next)=>{
         res.json(user);
     }
 
-   })
+   });
+
+   const forgetPasswordToken = asyncHandler(async(req,res)=>{
+    try{
+     const {email} = req.body;
+     const user = await User.findOne({email});
+     if(!user){
+        throw new Error("User not found");
+     }else{
+        const token = await user.createPasswordResetToken();
+        await user.save();
+        const resetUrl = `Hi, Please follow this link and it is valid for 10 min.<a href='http://localhost:3000/api/user/forget-password/${token}'>Click here</a>`;
+        const data = {
+            to: email,
+            text: "Hey User",
+            subject: "Forget password link",
+            link: resetUrl
+        }
+        sendEmail(data);
+        res.json(token);
+
+     }
+    }catch(e){
+        throw new Error(e);
+    }
+   });
 
 
-module.exports = {createUser,loginUserCtrl,getAllUsers,getAuser,deleteUser,updateUserDetails,blockUser,unblockUser,handleRefreshToken,logout,updatePassword};
+module.exports = {createUser,loginUserCtrl,getAllUsers,getAuser,deleteUser,updateUserDetails,blockUser,unblockUser,handleRefreshToken,logout,updatePassword,forgetPasswordToken};
